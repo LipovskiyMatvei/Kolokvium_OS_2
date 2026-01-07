@@ -21,7 +21,7 @@ expand_less
 
 1. **Клонируйте репозиторий** (или скачайте файлы):
    ```bash
-   git clone <LipovskiyMatvei/Kolokvium_OS_2>
+   git clone https://github.com/LipovskiyMatvei/Kolokvium_OS_2.git
 
 Установите зависимости:
 В проекте используется файл requirements.txt.
