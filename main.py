@@ -1,28 +1,37 @@
 from flask import Flask, jsonify, request
-
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-tasks = [
-    {
-        "id": 1,
-        "title": "Текстовая задача",
-        "description": "Проверить, что работает",
-        "status": "todo"
-    }
-]
 
-current_id = 1
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    status = db.Column(db.String(100), default="todo")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "status": self.status
+        }
+
+with app.app_context():
+    db.create_all()
 
 @app.route('/tasks', methods = ['POST'])
 def create_task():
-    global current_id
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Запрос пустой или не является JSON"}), 400
-
-
-
 
     if 'title' not in data:
         return jsonify({"error": "Отсутствует обязательное поле 'title'"}), 400
@@ -33,66 +42,72 @@ def create_task():
     if not data['title'].strip():
         return jsonify({"error": "Поле 'title' не может быть пустым"}), 400
 
+    new_task = Task(
+        title=data['title'],
+        description=data.get('description', ""),
+        status="todo"
+    )
+    db.session.add(new_task)
+    db.session.commit()
 
-    new_task = {
-        "id": current_id + 1,
-        "title": data['title'],
-        "description": data.get('description', ""),
-        "status": "todo"
-    }
-
-    tasks.append(new_task)
-    current_id += 1
-
-    return jsonify(new_task), 201
+    return jsonify(new_task.to_dict()), 201
 
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
+    all_tasks = Task.query.all()  
 
-    return jsonify(tasks)
+    return jsonify([task.to_dict() for task in all_tasks])
+
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
-    for task in tasks:
-        if task['id'] == task_id:
-            return jsonify(task)
+    task = Task.query.get(task_id)  
+    if task is None:
+        return jsonify({"error": "Not found"}), 404
 
-    return jsonify({"error": "Not found"}), 404
-
+    return jsonify(task.to_dict())
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    for task in tasks:
-        if task['id'] == task_id:
-            tasks.remove(task)
-            return jsonify({"result": True}), 200
-    return jsonify({"error": "Not found"}), 404
+    task = Task.query.get(task_id) 
+    if task is None:
+        return jsonify({"error": "Not found"}), 404
+
+    db.session.delete(task) 
+    db.session.commit()     
+
+    return jsonify({"result": True}), 200
 
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No data"}), 400
 
+    task = Task.query.get(task_id)
+    if task is None:
+        return jsonify({"error": "Not found"}), 404
+
+
     if 'title' in data:
         if not isinstance(data['title'], str) or not data['title'].strip():
-            return jsonify({"error": "Tittle is requiered"}), 400
+            return jsonify({"error": "Title is required"}), 400
+        task.title = data['title']
 
     if 'status' in data:
         allowed_status = ["to do", "done", "is_requiered"]
         if data['status'] not in allowed_status:
             return jsonify({"error": f"Status should be one of {allowed_status}"}), 400
+        task.status = data['status'] 
 
-    for task in tasks:
+    if 'description' in data:
+        task.description = data['description']
 
-        if task['id'] == task_id:
 
-            task['title'] = data.get('title', task['title'])
-            task['description'] = data.get('description', task['description'])
-            task['status'] = data.get('status', task['status'])
-            return jsonify(task), 200
-    return jsonify({"error": "Not found"}), 404
+    db.session.commit()
 
+    return jsonify(task.to_dict()), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
