@@ -54,14 +54,14 @@ def create_task():
 
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
-    all_tasks = Task.query.all()  
+    all_tasks = Task.query.all()
 
     return jsonify([task.to_dict() for task in all_tasks])
 
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
-    task = Task.query.get(task_id)  
+    task = Task.query.get(task_id)
     if task is None:
         return jsonify({"error": "Not found"}), 404
 
@@ -69,16 +69,16 @@ def get_task(task_id):
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    task = Task.query.get(task_id) 
+    task = Task.query.get(task_id)
     if task is None:
         return jsonify({"error": "Not found"}), 404
 
-    db.session.delete(task) 
-    db.session.commit()     
+    db.session.delete(task)
+    db.session.commit()
 
     return jsonify({"result": True}), 200
 
-@app.route('/tasks/<int:task_id>', methods=['PUT'])
+@app.route('/tasks/<int:task_id>', methods=['PUT', 'PATCH'])
 def update_task(task_id):
 
     data = request.get_json(silent=True)
@@ -99,7 +99,7 @@ def update_task(task_id):
         allowed_status = ["to do", "done", "is_requiered"]
         if data['status'] not in allowed_status:
             return jsonify({"error": f"Status should be one of {allowed_status}"}), 400
-        task.status = data['status'] 
+        task.status = data['status']
 
     if 'description' in data:
         task.description = data['description']
